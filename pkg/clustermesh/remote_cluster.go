@@ -251,6 +251,32 @@ func (rc *remoteCluster) onInsert(allocator RemoteIdentityWatcher) {
 			}
 		}
 	}()
+
+	go func() {
+	wait:
+		time.Sleep(100 * time.Millisecond)
+		for {
+			rc.mutex.Lock()
+			if rc.backend == nil {
+				rc.mutex.Unlock()
+				goto wait
+			}
+			statusCheckErrors := rc.backend.StatusCheckErrors()
+			rc.mutex.Unlock()
+
+			if statusCheckErrors == nil {
+				goto wait
+			}
+
+			select {
+			case err := <-statusCheckErrors:
+				if err != nil {
+					rc.getLogger().WithError(err).Warning("Error observed on etcd connection, reconnecting etcd")
+					rc.restartRemoteConnection(allocator)
+				}
+			}
+		}
+	}()
 }
 
 func (rc *remoteCluster) onRemove() {
