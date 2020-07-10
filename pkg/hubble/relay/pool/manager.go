@@ -301,16 +301,14 @@ func (m *Manager) connect(p *peer) {
 		p.mu.Lock()
 		defer p.mu.Unlock()
 		m.log.WithFields(logrus.Fields{
-			"address":      p.Address,
-			"dial timeout": m.opts.DialTimeout,
+			"address": p.Address,
 		}).Debugf("Connecting peer %s...", p.Name)
 		//FIXME: remove WithInsecure once mutual TLS is implemented
-		conn, err := newConn(p.Address.String(), m.opts.DialTimeout, grpc.WithInsecure(), grpc.WithBlock())
+		conn, err := m.opts.ClientConnBuilder.ClientConn(p.Address.String())
 		if err != nil {
 			m.log.WithFields(logrus.Fields{
-				"address":      p.Address,
-				"dial timeout": m.opts.DialTimeout,
-				"error":        err,
+				"address": p.Address,
+				"error":   err,
 			}).Warningf("Failed to create gRPC client connection to peer %s", p.Name)
 		} else {
 			p.conn = conn
@@ -333,10 +331,4 @@ func (m *Manager) disconnect(p *peer) {
 	}
 	p.conn = nil
 	m.log.Debugf("Peer %s disconnected", p.Name)
-}
-
-func newConn(target string, dialTimeout time.Duration, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
-	defer cancel()
-	return grpc.DialContext(ctx, target, opts...)
 }
